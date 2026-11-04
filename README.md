@@ -14,7 +14,7 @@
 
 <sub>[🇹🇷 Türkçe'ye geç](#turkce)</sub>
 
-A mod for **Moon Sweepers** that adds new purchasable upgrades to the upgrade tree and a "Bomb" option to the station's Moon map.
+A mod for **Moon Sweepers** that adds new purchasable upgrades to the upgrade tree, a buildable **Battery bank** for solar power storage and a "Bomb" option to the station's Moon map.
 
 > ⚠️ Unofficial, fan-made mod. Not affiliated with the game's developer. Back up your saves before installing.
 
@@ -27,6 +27,7 @@ A mod for **Moon Sweepers** that adds new purchasable upgrades to the upgrade tr
 | **Fast Pressure Chamber**: production cycle 12 s → 6 / 4 s | Upgrade tree → **Production** (new branch) | 2× / 3× | 20,000 / 50,000 |
 | **Fast Stone Press**: production cycle 6 s → 3 / 2 s | Upgrade tree → **Production** (new branch) | 2× / 3× | 50,000 / 100,000 |
 | **Bomb**: instantly completes an unfinished sector | Moon map → right-click | — | 5,000 |
+| **Battery bank**: stores surplus solar power (100 kWh) and powers the grid at night | Build menu → Power | — | 160 (game's own price) |
 
 All prices and multipliers can be changed in the settings file (see below).
 
@@ -37,6 +38,8 @@ All prices and multipliers can be changed in the settings file (see below).
 | Logistics → **Fast Conveyors** | Cleaning → **Turbo Joonas** |
 | ![New Production branch](docs/screenshots/en-03-production.jpg) | ![Bomb option on the Moon map](docs/screenshots/en-04-bomb-menu.jpg) |
 | New **PRODUCTION** branch | Moon map → right-click → **Bomb** |
+| ![Battery bank connected to the solar grid](docs/screenshots/en-05-battery.jpg) | |
+| Build menu → Power → **Battery bank** | |
 
 #### Languages
 
@@ -94,6 +97,12 @@ PresHiz1=2
 PresHiz2=3
 PresFiyat1=50000
 PresFiyat2=100000
+
+[Aku]                 ; Battery bank
+Acik=1                ; 0 = not in the build menu
+KapasiteKwh=100       ; storage per battery bank
+Fiyat=0               ; 0 = the game's own price
+SarjCarpani=10        ; charging speed multiplier (1 = real time)
 ```
 
 Changes apply after restarting the game. A debug log is written to `ConveyorMod.log` in the game folder.
@@ -104,6 +113,7 @@ Changes apply after restarting the game. A debug log is written to `ConveyorMod.
 - **Saves:** purchased levels are stored by the game's own upgrade system. If the mod is removed, those levels simply have no effect.
 - **Multiplayer:** tested in single player only. In multiplayer, everyone should use the same mod version, otherwise things may get out of sync.
 - **Bomb** completes the sector with the game's own "complete region" function. No sector cleaning payout is given for bombed sectors.
+- **Battery bank** is an unused structure that already ships with the game (model and card image); the mod adds it to the build menu. It joins the solar grid within 16 m and is charged from the panels' surplus. The blue power tethers are not drawn to the battery bank.
 
 ### How it works
 
@@ -114,6 +124,7 @@ The game is built with Unity IL2CPP, and its metadata version (v108) can't be re
 - Belt speed and output interval are constants compiled into the code, so the instructions that read them are redirected to the mod's own values.
 - For Joonas, the pressure chamber and the stone press, the game's own speed fields are scaled by the purchased level.
 - `MoonMapScreen.OpenMenu` is hooked to add the row to the map menu.
+- The Battery bank is added to `MoonDepotBuilder`'s catalog, and the power solver is patched to treat it as a zero-output panel with a large battery. After each `MoonWorld.Update`, the grid's wasted solar surplus is moved into its battery banks.
 
 ### Building
 
@@ -135,7 +146,7 @@ Output: `build\version.dll`
 
 <sub>[🇬🇧 Switch to English](#english)</sub>
 
-Moon Sweepers için yükseltme ağacına yeni satın alınabilir yükseltmeler ve istasyonun Ay haritasına "Bombala" seçeneği ekleyen bir mod.
+Moon Sweepers için yükseltme ağacına yeni satın alınabilir yükseltmeler, güneş enerjisini depolayan inşa edilebilir bir **Batarya bankası** ve istasyonun Ay haritasına "Bombala" seçeneği ekleyen bir mod.
 
 > ⚠️ Resmî olmayan, hayran yapımı bir moddur. Oyunun geliştiricisiyle bir bağlantısı yoktur. Kurmadan önce kayıtlarınızı yedekleyin.
 
@@ -148,6 +159,7 @@ Moon Sweepers için yükseltme ağacına yeni satın alınabilir yükseltmeler v
 | **Hızlı Basınç Odası**: üretim döngüsü 12 sn → 6 / 4 sn | Yükseltme ağacı → **Üretim** (yeni dal) | 2× / 3× | 20.000 / 50.000 |
 | **Hızlı Taş Presi**: üretim döngüsü 6 sn → 3 / 2 sn | Yükseltme ağacı → **Üretim** (yeni dal) | 2× / 3× | 50.000 / 100.000 |
 | **Bombala**: temizlenmemiş bir sektörü anında tamamlar | Ay haritası → sağ tık | — | 5.000 |
+| **Batarya bankası**: fazla güneş enerjisini depolar (100 kWh) ve gece şebekeyi besler | İnşa menüsü (güneş panelleriyle aynı sekme) | — | 160 (oyunun kendi fiyatı) |
 
 Bütün fiyatlar ve çarpanlar ayar dosyasından değiştirilebilir (aşağıya bakın).
 
@@ -158,6 +170,8 @@ Bütün fiyatlar ve çarpanlar ayar dosyasından değiştirilebilir (aşağıya 
 | Lojistik → **Hızlı Konveyör** | Temizlik → **Turbo Joonas** |
 | ![Yeni Üretim dalı](docs/screenshots/tr-03-uretim.jpg) | ![Ay haritasında Bombala seçeneği](docs/screenshots/tr-04-bomba.jpg) |
 | Yeni **ÜRETİM** dalı | Ay haritası → sağ tık → **Bombala** |
+| ![Güneş şebekesine bağlı Batarya bankası](docs/screenshots/tr-05-batarya.jpg) | |
+| İnşa menüsü → **Batarya bankası** | |
 
 #### Diller
 
@@ -215,6 +229,12 @@ PresHiz1=2
 PresHiz2=3
 PresFiyat1=50000
 PresFiyat2=100000
+
+[Aku]
+Acik=1                ; 0 = inşa menüsüne eklenmez
+KapasiteKwh=100       ; bir bataryanın depoladığı enerji
+Fiyat=0               ; 0 = oyunun kendi fiyatı
+SarjCarpani=10        ; şarj hızı çarpanı (1 = gerçek zaman)
 ```
 
 Değişiklikler oyunu yeniden başlatınca geçerli olur. Hata ayıklama için oyun klasöründe `ConveyorMod.log` tutulur.
@@ -225,6 +245,7 @@ Değişiklikler oyunu yeniden başlatınca geçerli olur. Hata ayıklama için o
 - **Kayıtlar:** Satın alınan seviyeler oyunun kendi yükseltme sistemiyle kaydedilir. Mod kaldırılırsa bu seviyeler etkisiz kalır.
 - **Çok oyunculu:** Sadece tek oyunculu oyunda test edildi. Çok oyunculu oyunda herkesin aynı mod sürümünü kullanması gerekir, aksi halde senkron sorunları olabilir.
 - **Bombala**, sektörü oyunun kendi "bölgeyi tamamla" fonksiyonuyla tamamlar. Bombalanan sektör için sektör temizleme ödemesi alınmaz.
+- **Batarya bankası**, oyunda hazır bulunan ama kullanılmayan bir yapıdır (modeli ve kart resmiyle). Mod onu inşa menüsüne ekler. 16 m içindeki güneş şebekesine katılır ve panellerin fazla enerjisiyle şarj olur. Mavi enerji ipleri bataryaya çizilmez.
 
 ### Nasıl çalışır?
 
@@ -235,6 +256,7 @@ Oyun Unity IL2CPP ile derlenmiş ve metadata sürümü (v108) mevcut mod araçla
 - Bant hızı ve çıkış aralığı derlenmiş koda gömülü sabitler olduğu için, bu sabitleri okuyan talimatlar modun kendi değişkenlerine yönlendirilir.
 - Joonas, basınç odası ve taş presi için oyunun kendi hız alanları satın alınan seviyeye göre ölçeklenir.
 - Harita menüsüne satır eklemek için `MoonMapScreen.OpenMenu` kancalanır.
+- Batarya bankası `MoonDepotBuilder` kataloğuna eklenir. Enerji çözücüsü onu üretimi sıfır, bataryası büyük bir panel gibi görecek şekilde yamalanır. Her `MoonWorld.Update` sonrasında şebekede boşa giden güneş fazlası bataryalara aktarılır.
 
 ### Derleme
 

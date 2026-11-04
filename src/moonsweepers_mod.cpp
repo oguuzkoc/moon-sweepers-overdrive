@@ -3,7 +3,9 @@
 //  2) "Turbo Joonas"    - Cleaning node, 3 levels: Joonas robots move/clean faster (near + far simulation).
 //  3) Map "Bombala"     - right-click on an unfinished sector in the station map: pay to complete it.
 // Settings: MoonSweepers_ConveyorMod.ini next to MoonSweepers.exe. Log: ConveyorMod.log (same folder).
+#define NOMINMAX
 #include <windows.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstdarg>
 #include <cstdint>
@@ -46,7 +48,16 @@ FWD(VerLanguageNameA) FWD(VerLanguageNameW) FWD(VerQueryValueA) FWD(VerQueryValu
     X(void, il2cpp_gc_wbarrier_set_field, (void*, void**, void*)) \
     X(void*, il2cpp_get_corlib, ()) \
     X(void*, il2cpp_thread_attach, (void*)) \
-    X(void, il2cpp_thread_detach, (void*))
+    X(void, il2cpp_thread_detach, (void*)) \
+    X(void*, il2cpp_class_get_methods, (void*, void**)) \
+    X(const char*, il2cpp_method_get_name, (void*)) \
+    X(uint32_t, il2cpp_method_get_param_count, (void*)) \
+    X(void*, il2cpp_method_get_param, (void*, uint32_t)) \
+    X(char*, il2cpp_type_get_name, (void*)) \
+    X(void, il2cpp_free, (void*)) \
+    X(void*, il2cpp_class_get_type, (void*)) \
+    X(void*, il2cpp_type_get_object, (void*)) \
+    X(void*, il2cpp_class_get_parent, (void*))
 
 #define DECL(ret, name, args) typedef ret (*name##_t) args; static name##_t name;
 IL2CPP_FNS(DECL)
@@ -62,6 +73,10 @@ static bool g_bombEnabled = true;
 static float g_chamberMult[4] = {1.f, 2.f, 3.f, 3.f};
 static int g_chamberPrice[3] = {20000, 50000, 0};
 static float g_pressMult[4] = {1.f, 2.f, 3.f, 3.f};
+static bool g_batteryEnabled = true;
+static int g_batteryPrice = 0;          // 0 = keep the game's own price
+static float g_batteryKwh = 100.f;
+static float g_batteryRate = 10.f;   // charging speed multiplier
 static int g_pressPrice[3] = {50000, 100000, 0};
 
 static const char* kBeltNode = "logi.conveyor_speed";
@@ -203,6 +218,11 @@ static void LoadSettings(const char* dir) {
            "\n; Uretim dali: basinc odasi ve tas presi uretim dongusu hizlari (2 seviye).\n"
            "[Uretim]\nBasincHiz1=2\nBasincHiz2=3\nBasincFiyat1=20000\nBasincFiyat2=50000\n"
            "PresHiz1=2\nPresHiz2=3\nPresFiyat1=50000\nPresFiyat2=100000\n");
+    ensure("Aku",
+           "\n; Battery bank: oyunun gizli akusu insa menusune eklenir ve gunes paneli agina depolama olarak baglanir.\n"
+           "; KapasiteKwh = bir akunun depoladigi enerji. Fiyat=0 ise oyunun kendi fiyati kullanilir.\n"
+           "; SarjCarpani = sarj hizi carpani (1 = gercek zaman, 10 = 10 kat hizli).\n"
+           "[Aku]\nAcik=1\nKapasiteKwh=100\nFiyat=0\nSarjCarpani=10\n");
 
     ReadTriple(ini, "Konveyor", "Hiz%d", g_beltMult);
     ReadPrices(ini, "Konveyor", g_beltPrice);
@@ -221,6 +241,13 @@ static void LoadSettings(const char* dir) {
     g_chamberPrice[1] = GetPrivateProfileIntA("Uretim", "BasincFiyat2", g_chamberPrice[1], ini);
     g_pressPrice[0] = GetPrivateProfileIntA("Uretim", "PresFiyat1", g_pressPrice[0], ini);
     g_pressPrice[1] = GetPrivateProfileIntA("Uretim", "PresFiyat2", g_pressPrice[1], ini);
+    g_batteryEnabled = GetPrivateProfileIntA("Aku", "Acik", 1, ini) != 0;
+    g_batteryPrice = GetPrivateProfileIntA("Aku", "Fiyat", 0, ini);
+    { char buf[32]; GetPrivateProfileStringA("Aku", "KapasiteKwh", "100", buf, sizeof buf, ini);
+      float f = (float)atof(buf); if (f > 0.f && f <= 100000.f) g_batteryKwh = f; }
+    { char buf[32]; GetPrivateProfileStringA("Aku", "SarjCarpani", "10", buf, sizeof buf, ini);
+      float f = (float)atof(buf); if (f > 0.f && f <= 1000.f) g_batteryRate = f; }
+    Log("aku: acik=%d kapasite %.1f kWh fiyat %d", g_batteryEnabled, g_batteryKwh, g_batteryPrice);
     Log("uretim: basinc %.2g/%.2g fiyat %d/%d | pres %.2g/%.2g fiyat %d/%d", g_chamberMult[1], g_chamberMult[2],
         g_chamberPrice[0], g_chamberPrice[1], g_pressMult[1], g_pressMult[2], g_pressPrice[0], g_pressPrice[1]);
     Log("konveyor %.2g/%.2g/%.2g fiyat %d/%d/%d cikislar=%d | joonas %.2g/%.2g/%.2g fiyat %d/%d/%d | bomba=%d fiyat %d",
@@ -598,6 +625,8 @@ static bool InstallOpenMenuHook() {
     return true;
 }
 
+#include "battery.h"
+
 // ---------------- language ----------------
 static void* g_locK;
 static void LogLanguages() {
@@ -642,8 +671,31 @@ static void UpdateLanguage() {
             SetRef(tags, 0x20 + kProductionBranch * 8, NewStr(Txt(T_BRANCH_TAGLINE)));
         }
     }
+    g_batterySub = NewStr(Txt(T_BATTERY_SUB));
     if (applied != -1 || g_ourNodeCount) Log("dil: '%s' -> %s", c.c_str(), kLangs[idx].code);
     applied = g_ourNodeCount ? idx : -1;   // re-apply once nodes exist
+}
+
+// ---------------- periodic work (main thread, from the MoonWorld.Update hook) ----------------
+static void* g_tickIds[4];   // belt, joonas, chamber, press node ids
+static void ModTick(void* world) {
+    static ULONGLONG next = 0;
+    ULONGLONG now = GetTickCount64();
+    if (now < next || !g_tickIds[0]) return;
+    next = now + 500;
+    static int lastBelt = -1, lastJoonas = -1, lastChamber = -1, lastPress = -1;
+    UpdateLanguage();
+    int belt = TreeLevel(world, g_tickIds[0]), joonas = TreeLevel(world, g_tickIds[1]);
+    if (g_speed) {
+        g_speed[0] = kBaseSpeed * g_beltMult[belt];
+        *g_emit = kBaseEmit / g_beltMult[belt];
+    }
+    if (belt != lastBelt) { Log("konveyor seviye %d -> hiz %.3g (x%g), cikis araligi %.3gs", belt, g_speed ? g_speed[0] : 0.f, g_beltMult[belt], g_emit ? *g_emit : 0.f); lastBelt = belt; }
+    if (joonas != lastJoonas) { Log("joonas seviye %d -> x%g", joonas, g_joonasMult[joonas]); lastJoonas = joonas; }
+    SafeApplyJoonas(world, g_joonasMult[joonas]);
+    int chamber = TreeLevel(world, g_tickIds[2]), press = TreeLevel(world, g_tickIds[3]);
+    ApplyProcessor("ChamberSpec", g_chamberMult[chamber], chamber, lastChamber);
+    ApplyProcessor("PressSpec", g_pressMult[press], press, lastPress);
 }
 
 // ---------------- shutdown detection ----------------
@@ -671,12 +723,35 @@ static DWORD WINAPI Worker(LPVOID) {
 #define RES(ret, name, args) name = (name##_t)GetProcAddress(ga, #name); if (!name) { Log("HATA: export yok %s", #name); return 0; }
     IL2CPP_FNS(RES)
 
-    for (int i = 0; i < 600; i++) {
-        g_domain = il2cpp_domain_get(); size_t n = 0;
-        if (g_domain && il2cpp_domain_get_assemblies(g_domain, &n) && n > 10 && FindClass("MoonCleaners", "MoonUpgradeTree")) break;
+    // This thread is not registered with the GC yet, so it must not call anything that can allocate.
+    // il2cpp_domain_get creates the domain when it does not exist yet, so read the runtime's domain
+    // pointer straight from memory instead (export -> jmp Domain::GetCurrent -> mov rax,[rip+x]).
+    void** domainSlot = nullptr;
+    {
+        uint8_t* p = (uint8_t*)il2cpp_domain_get;
+        if (p[0] == 0xE9) p += 5 + *(int32_t*)(p + 1);
+        for (int k = 0; k < 16 && !domainSlot; k++)
+            if (p[k] == 0x48 && p[k + 1] == 0x8B && p[k + 2] == 0x05)
+                domainSlot = (void**)(p + k + 7 + *(int32_t*)(p + k + 3));
+    }
+    if (!domainSlot) { Log("HATA: domain adresi bulunamadi"); return 0; }
+    for (int i = 0; i < 1200 && !(g_domain = *(void* volatile*)domainSlot); i++) Sleep(100);
+    if (!g_domain) { Log("HATA: domain olusmadi"); return 0; }
+    // Let the runtime finish starting (game window up) before joining it.
+    for (int i = 0; i < 1200; i++) {
+        HWND w = nullptr; DWORD pid = 0;
+        while ((w = FindWindowExA(nullptr, w, "UnityWndClass", nullptr)))
+            if (GetWindowThreadProcessId(w, &pid), pid == GetCurrentProcessId()) break;
+        if (w) break;
         Sleep(100);
     }
+    Sleep(2000);
     void* thread = il2cpp_thread_attach(g_domain);
+    for (int i = 0; i < 600; i++) {
+        size_t n = 0;
+        if (il2cpp_domain_get_assemblies(g_domain, &n) && n > 10 && FindClass("MoonCleaners", "MoonUpgradeTree")) break;
+        Sleep(100);
+    }
 
     g_speed = AllocNear(g_base);
     if (g_speed) {
@@ -708,41 +783,18 @@ static DWORD WINAPI Worker(LPVOID) {
     }
     Log("LocalPlayer = '%s'", Str(g_localPlayer).c_str());
     if (g_bombEnabled && g_localPlayer) InstallOpenMenuHook();
+    InstallBattery();
 
-    void* beltId = NewStr(kBeltNode);
-    void* joonasId = NewStr(kJoonasNode);
-    void* chamberId = NewStr(kChamberNode);
-    void* pressId = NewStr(kPressNode);
-    int lastBelt = -1, lastJoonas = -1, lastChamber = -1, lastPress = -1;
-    // Stay attached to the IL2CPP runtime only while doing work: a permanently attached thread
-    // blocks the runtime shutdown and makes the game hang on exit.
+    g_tickIds[0] = NewStr(kBeltNode);
+    g_tickIds[1] = NewStr(kJoonasNode);
+    g_tickIds[2] = NewStr(kChamberNode);
+    g_tickIds[3] = NewStr(kPressNode);
+    // Setup is done. Everything periodic now runs on the game's main thread (MoonWorld.Update hook ->
+    // ModTick), so this thread leaves the runtime and ends: no attach/detach churn (which raced with
+    // the GC and crashed) and nothing left attached at shutdown (which made the game hang on exit).
     il2cpp_thread_detach(thread);
-    bool sawWindow = false;
-    for (;;) {
-        Sleep(500);
-        bool alive = GameWindowAlive();
-        if (alive) sawWindow = true;
-        else if (sawWindow) { Log("oyun kapaniyor, mod thread'i durdu"); return 0; }
-        thread = il2cpp_thread_attach(g_domain);
-        UpdateLanguage();
-        void* world = g_worldK ? FindWorld() : nullptr;
-        int belt = 0, joonas = 0;
-        if (world) { belt = TreeLevel(world, beltId); joonas = TreeLevel(world, joonasId); }
-        if (g_speed) {
-            g_speed[0] = kBaseSpeed * g_beltMult[belt];
-            *g_emit = kBaseEmit / g_beltMult[belt];
-        }
-        if (belt != lastBelt) { Log("konveyor seviye %d -> hiz %.3g (x%g), cikis araligi %.3gs", belt, g_speed ? g_speed[0] : 0.f, g_beltMult[belt], g_emit ? *g_emit : 0.f); lastBelt = belt; }
-        if (joonas != lastJoonas) { Log("joonas seviye %d -> x%g", joonas, g_joonasMult[joonas]); lastJoonas = joonas; }
-        InterlockedExchange(&g_joonasLevel, joonas);
-        if (world) {
-            SafeApplyJoonas(world, g_joonasMult[joonas]);
-            int chamber = TreeLevel(world, chamberId), press = TreeLevel(world, pressId);
-            ApplyProcessor("ChamberSpec", g_chamberMult[chamber], chamber, lastChamber);
-            ApplyProcessor("PressSpec", g_pressMult[press], press, lastPress);
-        }
-        il2cpp_thread_detach(thread);
-    }
+    Log("kurulum bitti, periyodik isler ana thread'de");
+    return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE h, DWORD reason, LPVOID) {
@@ -756,7 +808,7 @@ BOOL APIENTRY DllMain(HMODULE h, DWORD reason, LPVOID) {
         if (char* s = strrchr(dir, '\\')) *s = 0;
         char logp[MAX_PATH]; snprintf(logp, MAX_PATH, "%s\\ConveyorMod.log", dir);
         g_log = fopen(logp, "w");
-        Log("Moon Sweepers modu yuklendi (konveyor + joonas + bomba)");
+        Log("Moon Sweepers modu yuklendi (konveyor + joonas + bomba + aku)");
         LoadSettings(dir);
         CloseHandle(CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr));
     }
