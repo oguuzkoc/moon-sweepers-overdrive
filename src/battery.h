@@ -202,30 +202,44 @@ static __declspec(noinline) void ShareSurplus(void* world) {
     if (!(dt > 0.f) || dt > 1.f) return;
     double hours = dt / 3600.0;
 
-    std::map<int, double> wasted;
-    std::map<int, std::vector<void*>> banks;
-    for (int i = 0; i < count && (size_t)i < ArrLen(items); i++) {
+    // reused every frame: no heap allocation in the steady state
+    struct Bank { int grid; void* st; };
+    struct Waste { int grid; double kwh; };
+    static std::vector<Bank> banks;
+    static std::vector<Waste> wasted;
+    banks.clear(); wasted.clear();
+    // drop states of demolished panels now and then
+    if (g_prevCharge.size() > (size_t)count * 2 + 64) g_prevCharge.clear();
+    size_t n = std::min((size_t)count, ArrLen(items));
+    for (size_t i = 0; i < n; i++) {
         void* node = ArrPtrs(items)[i];
         if (!node) continue;
         void* rec = At<void*>(node, 0x10); void* st = At<void*>(node, 0x18);
         if (!rec || !st) continue;
         int grid = At<int>(st, 0x4c);
-        if (At<int>(rec, 0x14) == kBatteryBankKind) { banks[grid].push_back(st); continue; }
+        if (At<int>(rec, 0x14) == kBatteryBankKind) { banks.push_back({grid, st}); continue; }
         if (!At<bool>(node, 0x50)) continue;   // panels only
         double charge = At<double>(st, 0x50);
-        auto it = g_prevCharge.find(st);
-        double stored = it == g_prevCharge.end() ? 0.0 : std::max(0.0, charge - it->second);
-        g_prevCharge[st] = charge;
+        double& prev = g_prevCharge.try_emplace(st, charge).first->second;
+        double stored = std::max(0.0, charge - prev);
+        prev = charge;
         double surplus = std::max(0.f, At<float>(st, 0x30) - At<float>(st, 0x58)) * hours * g_batteryRate;
-        wasted[grid] += std::max(0.0, surplus - stored);
+        double w = surplus - stored;
+        if (w <= 0) continue;
+        bool found = false;
+        for (auto& x : wasted) if (x.grid == grid) { x.kwh += w; found = true; break; }
+        if (!found) wasted.push_back({grid, w});
     }
-    for (auto& [grid, list2] : banks) {
-        double pool = wasted[grid];
-        for (size_t k = 0; k < list2.size() && pool > 1e-9; k++) {
-            void* st = list2[k];
-            double room = g_batteryKwh - At<double>(st, 0x50);
-            double give = std::min(room, pool / (double)(list2.size() - k));
-            if (give > 0) { At<double>(st, 0x50) += give; pool -= give; }
+    if (banks.empty() || wasted.empty()) return;
+    for (auto& wg : wasted) {
+        size_t left = 0;
+        for (auto& b : banks) if (b.grid == wg.grid) left++;
+        double pool = wg.kwh;
+        for (auto& b : banks) {
+            if (b.grid != wg.grid || pool <= 1e-9) continue;
+            double room = g_batteryKwh - At<double>(b.st, 0x50);
+            double give = std::min(room, pool / (double)left--);
+            if (give > 0) { At<double>(b.st, 0x50) += give; pool -= give; }
         }
     }
 }
