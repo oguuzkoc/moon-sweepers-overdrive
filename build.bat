@@ -4,16 +4,16 @@ rem Requires Visual Studio 2022 (or Build Tools) with the "Desktop development w
 setlocal
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" (
-    echo vswhere.exe bulunamadi. Visual Studio 2022 / Build Tools kurulu olmali.
+    echo vswhere.exe not found. Visual Studio 2022 or Build Tools must be installed.
     exit /b 1
 )
 for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VS=%%i"
 if not defined VS (
-    echo C++ derleyicisi bulunamadi. "Desktop development with C++" bilesenini kurun.
+    echo C++ compiler not found. Install the "Desktop development with C++" workload.
     exit /b 1
 )
 call "%VS%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
 if not exist build mkdir build
 cl /nologo /O2 /EHsc /MT /std:c++17 /utf-8 /LD src\moonsweepers_mod.cpp user32.lib /Fobuild\ /Fdbuild\ /link /OUT:build\version.dll /IMPLIB:build\version.lib || exit /b 1
 echo.
-echo Derlendi: build\version.dll
+echo Built: build\version.dll
