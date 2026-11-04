@@ -136,6 +136,10 @@ build.bat
 
 Output: `build\version.dll`
 
+### License
+
+[MIT](LICENSE). Moon Sweepers and its assets belong to their respective owners; this repository contains only the mod's own code.
+
 <sub>[⬆ Back to top](#top)</sub>
 
 ---
@@ -267,5 +271,9 @@ build.bat
 ```
 
 Çıktı: `build\version.dll`
+
+### Lisans
+
+[MIT](LICENSE). Moon Sweepers ve varlıkları sahiplerine aittir. Bu depo yalnızca modun kendi kodunu içerir.
 
 <sub>[⬆ Başa dön](#top)</sub>
