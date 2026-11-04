@@ -18,6 +18,14 @@ A mod for **Moon Sweepers** that adds new purchasable upgrades to the upgrade tr
 
 > ⚠️ Unofficial, fan-made mod. Not affiliated with the game's developer. Back up your saves before installing.
 
+### ☕ Support
+
+**If you enjoy the mod, you can support its development:**
+
+<p><b>USDT (TRC20):</b> <b><code>TVosk9CuQNGR9hXyHZMm9kVz8mczLMkZGM</code></b></p>
+
+> ⚠️ Send only USDT on the TRON (TRC20) network to this address.
+
 ### Features
 
 | Feature | Where | Levels | Price |
@@ -153,6 +161,14 @@ Output: `build\version.dll`
 Moon Sweepers için yükseltme ağacına yeni satın alınabilir yükseltmeler, güneş enerjisini depolayan inşa edilebilir bir **Batarya bankası** ve istasyonun Ay haritasına "Bombala" seçeneği ekleyen bir mod.
 
 > ⚠️ Resmî olmayan, hayran yapımı bir moddur. Oyunun geliştiricisiyle bir bağlantısı yoktur. Kurmadan önce kayıtlarınızı yedekleyin.
+
+### ☕ Destek
+
+**Modu beğendiyseniz geliştirilmesine destek olabilirsiniz:**
+
+<p><b>USDT (TRC20):</b> <b><code>TVosk9CuQNGR9hXyHZMm9kVz8mczLMkZGM</code></b></p>
+
+> ⚠️ Bu adrese sadece TRON (TRC20) ağında USDT gönderin.
 
 ### Özellikler
 
